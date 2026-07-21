@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biometric Sleep Console</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg: #09090b; --surface: #18181b; --border: #27272a;
+            --text-main: #f4f4f5; --text-dim: #a1a1aa;
+            --accent-green: #10b981; --accent-blue: #3b82f6; --accent-red: #ef4444; --accent-purple: #a855f7;
+        }
+        body { background: var(--bg); color: var(--text-main); font-family: system-ui, sans-serif; margin: 0; padding: 30px; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 30px; }
+        h1 { margin: 0; font-size: 24px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+        
+        button { background: var(--text-main); color: var(--bg); border: none; padding: 10px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }
+        #recordBtn { background: var(--surface); color: var(--text-main); border: 1px solid var(--border); }
+        #recordBtn.recording { background: rgba(239, 68, 68, 0.1); color: var(--accent-red); border-color: var(--accent-red); box-shadow: 0 0 10px rgba(239, 68, 68, 0.2); }
+        #downloadBtn { background: var(--accent-blue); color: white; display: none; }
+
+        .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .card-label { font-size: 13px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 1px; }
+        .card-value { font-size: 36px; font-weight: 700; line-height: 1; font-family: monospace; }
+        
+        .bed-visual { display: flex; gap: 4px; margin-top: 15px; height: 30px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+        .zone { flex: 1; background: var(--bg); transition: 0.1s; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--text-dim); }
+        .zone.active { background: var(--accent-blue); color: #fff; font-weight: bold; box-shadow: inset 0 0 10px rgba(59, 130, 246, 0.5); }
+
+        .chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; height: 350px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+
+        /* Supercharged AI Terminal Styling */
+        #ai-terminal {
+            background: #000;
+            border: 1px solid var(--accent-green);
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'Courier New', Courier, monospace;
+            color: var(--accent-green);
+            white-space: pre-wrap;
+            line-height: 1.6;
+            max-height: 500px;
+            overflow-y: auto;
+            font-size: 14px;
+            box-shadow: inset 0 0 20px rgba(16, 185, 129, 0.1);
+        }
+        #ai-terminal::selection { background: var(--accent-green); color: #000; }
+        .terminal-header { color: #fff; border-bottom: 1px dashed var(--accent-green); padding-bottom: 10px; margin-bottom: 15px; font-weight: bold; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>
+            <h1>Biometric Sleep Console</h1>
+            <div style="margin-top: 8px; color: var(--accent-green); font-size: 14px; font-family: monospace;" id="statusText">SYSTEM_DISCONNECTED</div>
+        </div>
+        <div style="display: flex; gap: 15px;">
+            <button id="recordBtn" disabled>⏺ INIT_LOG</button>
+            <button id="downloadBtn">⬇️ EXPORT_DATA</button>
+            <button id="connectBtn" style="background: var(--accent-green); color: #000;">CONNECT_TELEMETRY</button>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="card-label">Efficiency Delta</div>
+            <div class="card-value" id="score-val" style="color: var(--accent-green);">100%</div>
+            <div style="font-size: 14px; color: var(--text-dim); margin-top: 8px; font-family: monospace;" id="score-sub">OPTIMAL_REST</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Spatial Orientation</div>
+            <div class="card-value" id="state-val" style="color: var(--text-dim); font-size: 24px;">IDLE</div>
+            <div class="bed-visual">
+                <div class="zone" id="zone-l">L_ZONE</div>
+                <div class="zone" id="zone-r">R_ZONE</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-label">Kinetic Anomalies</div>
+            <div class="card-value" id="moves-val" style="color: var(--accent-purple);">0</div>
+            <div style="font-size: 14px; color: var(--text-dim); margin-top: 8px; font-family: monospace;">TOSS_TURN_EVENTS</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Acoustic Resonance</div>
+            <div class="card-value" id="noise-val">0</div>
+            <div style="font-size: 14px; color: var(--text-dim); margin-top: 8px; font-family: monospace;" id="fan-sub">HVAC_LOAD: 0%</div>
+        </div>
+    </div>
+
+    <!-- Supercharged AI Summary Container -->
+    <div class="grid" id="ai-summary-container" style="display: none;">
+        <div class="card" style="grid-column: span 4; border-color: var(--accent-green); padding: 0; overflow: hidden;">
+            <div id="ai-terminal">
+                <div class="terminal-header">>> INIT: NEMOTRON ULTRA ADVANCED DIAGNOSTICS ALGORITHM...</div>
+                <span id="ai-summary-text">Awaiting telemetry datastream...</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="chart-container"><canvas id="liveChart"></canvas></div>
+
+    <script>
+        let port, reader;
+        let efficiencyScore = 100;
+        let lastMoveCount = 0;
+        
+        let isRecording = false;
+        let sessionData = [];
+        let recordingStartTime = 0;
+
+        const timeLabels = [], noiseData = [];
+        const ctx = document.getElementById('liveChart').getContext('2d');
+        const liveChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: timeLabels,
+                datasets: [{
+                    label: 'Acoustic Spikes', borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    data: noiseData, fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { grid: { color: '#27272a' } }, x: { display: false } }, plugins: { legend: { display: false } } }
+        });
+
+        document.getElementById('connectBtn').addEventListener('click', async () => {
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 9600 });
+                document.getElementById('connectBtn').style.display = 'none';
+                document.getElementById('recordBtn').disabled = false;
+                document.getElementById('statusText').innerText = 'DATALINK_ESTABLISHED';
+                document.getElementById('statusText').style.color = 'var(--accent-blue)';
+
+                const textDecoder = new TextDecoderStream();
+                port.readable.pipeTo(textDecoder.writable);
+                reader = textDecoder.readable.getReader();
+
+                let buffer = '';
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    buffer += value;
+                    let lines = buffer.split('\n');
+                    buffer = lines.pop(); 
+                    for (let line of lines) { processData(line.trim()); }
+                }
+            } catch (e) { 
+                document.getElementById('statusText').innerText = 'ERR_CONNECTION_FAILED'; 
+                document.getElementById('statusText').style.color = 'var(--accent-red)';
+            }
+        });
+
+        document.getElementById('recordBtn').addEventListener('click', async () => {
+            isRecording = !isRecording;
+            const btn = document.getElementById('recordBtn');
+            const summaryContainer = document.getElementById('ai-summary-container');
+            const summaryText = document.getElementById('ai-summary-text');
+
+            if (isRecording) {
+                btn.innerText = '⏹ HALT_LOG'; 
+                btn.classList.add('recording');
+                document.getElementById('downloadBtn').style.display = 'none';
+                summaryContainer.style.display = 'none';
+                sessionData = []; 
+                recordingStartTime = Date.now();
+                document.getElementById('statusText').innerText = 'RECORDING_TELEMETRY...';
+            } else {
+                btn.innerText = '⏺ INIT_LOG'; 
+                btn.classList.remove('recording');
+                document.getElementById('downloadBtn').style.display = 'inline-block';
+                document.getElementById('statusText').innerText = 'DATALINK_ESTABLISHED';
+                
+                if (sessionData.length > 0) {
+                    summaryContainer.style.display = 'grid';
+                    summaryText.innerText = ">> UPLOADING TELEMETRY TO NEMOTRON MAINFRAME...\n>> EXECUTING DEEP SLEEP ARCHITECTURE ANALYSIS...\n>> PLEASE WAIT.";
+                    await generateSleepSummary();
+                }
+            }
+        });
+
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            const header = "Timestamp_ms,SysActive,ZoneL,ZoneR,TossAndTurns,MicVolume,Fan_PWM_Percent\n";
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([header + sessionData.join("\n")], { type: 'text/csv' }));
+            a.download = `BioTelemetry_${Date.now()}.csv`;
+            a.click();
+        });
+
+        async function generateSleepSummary() {
+            let totalMoves = 0;
+            let totalMic = 0;
+            let leftTicks = 0;
+            let rightTicks = 0;
+
+            sessionData.forEach(row => {
+                const parts = row.split(',');
+                if (parts[2] === '1') leftTicks++;
+                if (parts[3] === '1') rightTicks++;
+                totalMic += parseInt(parts[5] || 0);
+                totalMoves = Math.max(totalMoves, parseInt(parts[4] || 0)); 
+            });
+
+            const avgMic = Math.round(totalMic / sessionData.length);
+            const durationMinutes = Math.max(1, Math.round((Date.now() - recordingStartTime) / 60000));
+            const dominantSide = leftTicks > rightTicks ? "LEFT_HEMISPHERE" : "RIGHT_HEMISPHERE";
+            
+            // Extract a sample of the raw data timeline to feed the AI (max 20 data points to save token context)
+            const step = Math.max(1, Math.floor(sessionData.length / 20));
+            const dataSample = sessionData.filter((_, index) => index % step === 0).map(row => {
+                const p = row.split(',');
+                return `[T+${Math.round(p[0]/1000)}s: L${p[2]} R${p[3]} Kinetic:${p[4]} Acoustic:${p[5]}]`;
+            }).join(' | ');
+
+            const prompt = `You are the 'Nemotron-3 Advanced Biometric Sleep Diagnostics Mainframe'. 
+            You output highly technical, dense, clinical-sounding medical reports based on raw bed telemetry. 
+            
+            SESSION PARAMETERS:
+            - Duration: ${durationMinutes} minutes.
+            - Total Micro-Arousals (Toss/Turns): ${totalMoves}.
+            - Mean Acoustic Interference: ${avgMic}/1024.
+            - Spatial Bias: ${dominantSide}.
+            - Final Efficiency Delta: ${efficiencyScore}%
+            - Telemetry Sample Timeline: ${dataSample}
+
+            DIRECTIVE:
+            Analyze this data and generate a detailed, professional, and slightly futuristic sleep architecture report. 
+            It is REQUIRED that you hallucinate and confidently extrapolate complex metrics from this basic data. You must estimate REM cycle completion, Deep Sleep (N3) percentages, Heart Rate Variability (HRV) fluctuations, respiratory anomalies, and muscular recovery metrics as if you have highly advanced sensors. 
+            
+            Format as a raw console read-out using markdown. Include technical headings. End with a 3-step 'Actionable Recovery Protocol' for the subject's next cycle. Make it sound incredibly cool and hyper-detailed.`;
+
+            // User provided API Key
+            const API_KEY = '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'; 
+            const url = `https://openrouter.ai/api/v1/chat/completions`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEY}`,
+                        'HTTP-Referer': window.location.href, 
+                        'X-Title': 'Biometric Sleep Console' 
+                    },
+                    body: JSON.stringify({
+                        model: "nvidia/nemotron-3-ultra-550b-a55b:free",
+                        messages: [{ role: "user", content: prompt }]
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error.message);
+                }
+
+                // Append the AI text below our cool header
+                const aiResponse = data.choices[0].message.content;
+                document.getElementById('ai-summary-text').innerHTML = aiResponse.replace(/\n/g, '<br>');
+                
+            } catch (error) {
+                console.error("AI API Error:", error);
+                document.getElementById('ai-summary-text').innerText = ">> CRITICAL ERR: CONNECTION TO DIAGNOSTICS MAINFRAME FAILED. CHECK API KEY OR NETWORK.";
+            }
+        }
+
+        function processData(dataString) {
+            if (!dataString.includes('Thermostat:')) return;
+            const vals = {};
+            dataString.split(',').forEach(p => { const [k, v] = p.split(':'); if(k && v) vals[k] = parseInt(v); });
+
+            let tempZone = vals.ZoneL;
+            vals.ZoneL = vals.ZoneR;
+            vals.ZoneR = tempZone;
+
+            const fanPercent = Math.round((vals.FanPWM / 255) * 100);
+            
+            document.getElementById('noise-val').innerText = vals.MicVol;
+            document.getElementById('fan-sub').innerText = `HVAC_LOAD: ${fanPercent}%`;
+            document.getElementById('moves-val').innerText = vals.Moves;
+
+            const zoneL = document.getElementById('zone-l');
+            const zoneR = document.getElementById('zone-r');
+            if (vals.ZoneL === 1) zoneL.classList.add('active'); else zoneL.classList.remove('active');
+            if (vals.ZoneR === 1) zoneR.classList.add('active'); else zoneR.classList.remove('active');
+
+            if (vals.Sys === 0) {
+                efficiencyScore = 100;
+                lastMoveCount = 0;
+                document.getElementById('state-val').innerText = 'IDLE';
+                document.getElementById('state-val').style.color = 'var(--text-dim)';
+            } else {
+                if (vals.ZoneL && vals.ZoneR) document.getElementById('state-val').innerText = 'CENTERED';
+                else if (vals.ZoneL) document.getElementById('state-val').innerText = 'L_BIAS';
+                else if (vals.ZoneR) document.getElementById('state-val').innerText = 'R_BIAS';
+                else document.getElementById('state-val').innerText = 'SCANNING...'; 
+                
+                document.getElementById('state-val').style.color = '#fff';
+
+                if (vals.MicVol > 45) {
+                    efficiencyScore = Math.max(40, efficiencyScore - 2.5);
+                } else if (vals.Moves > lastMoveCount) {
+                    efficiencyScore = Math.max(40, efficiencyScore - 5.0); 
+                    lastMoveCount = vals.Moves;
+                } else {
+                    efficiencyScore = Math.min(100, efficiencyScore + 0.5); 
+                }
+            }
+
+            const scoreEl = document.getElementById('score-val');
+            scoreEl.innerText = Math.round(efficiencyScore) + '%';
+            if (efficiencyScore >= 85) scoreEl.style.color = 'var(--accent-green)';
+            else if (efficiencyScore >= 70) scoreEl.style.color = '#fbbf24';
+            else scoreEl.style.color = 'var(--accent-red)';
+
+            if (isRecording) {
+                sessionData.push(`${Date.now() - recordingStartTime},${vals.Sys},${vals.ZoneL},${vals.ZoneR},${vals.Moves},${vals.MicVol},${fanPercent}`);
+                document.getElementById('statusText').innerText = `REC_TIME: ${Math.floor((Date.now() - recordingStartTime)/1000)}s`;
+            }
+
+            timeLabels.push(''); noiseData.push(vals.MicVol);
+            if (timeLabels.length > 50) { timeLabels.shift(); noiseData.shift(); }
+            liveChart.update();
+        }
+    </script>
+</body>
+</html>
