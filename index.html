@@ -41,9 +41,9 @@
             color: var(--accent-green);
             white-space: pre-wrap;
             line-height: 1.6;
-            max-height: 500px;
+            max-height: 650px;
             overflow-y: auto;
-            font-size: 14px;
+            font-size: 13px;
             box-shadow: inset 0 0 20px rgba(16, 185, 129, 0.1);
         }
         #ai-terminal::selection { background: var(--accent-green); color: #000; }
@@ -90,11 +90,11 @@
         </div>
     </div>
 
-    <!-- Supercharged AI Summary Container -->
+    <!-- AI Summary Container -->
     <div class="grid" id="ai-summary-container" style="display: none;">
         <div class="card" style="grid-column: span 4; border-color: var(--accent-green); padding: 0; overflow: hidden;">
             <div id="ai-terminal">
-                <div class="terminal-header">>> INIT: NEMOTRON ULTRA ADVANCED DIAGNOSTICS ALGORITHM...</div>
+                <div class="terminal-header">>> INIT: DEEP REASONING DIAGNOSTIC ENGINE...</div>
                 <span id="ai-summary-text">Awaiting telemetry datastream...</span>
             </div>
         </div>
@@ -175,7 +175,7 @@
                 
                 if (sessionData.length > 0) {
                     summaryContainer.style.display = 'grid';
-                    summaryText.innerText = ">> UPLOADING TELEMETRY TO NEMOTRON MAINFRAME...\n>> EXECUTING DEEP SLEEP ARCHITECTURE ANALYSIS...\n>> PLEASE WAIT.";
+                    summaryText.innerText = ">> UPLOADING TELEMETRY TO NEMOTRON DEEP REASONING MAINFRAME...\n>> EXECUTING HEAVY NEURAL SIMULATION & PHYSIOLOGICAL HYPOTHESIS GENERATION...\n>> THIS WILL TAKE EXTRA COMPUTE TIME. PLEASE WAIT.";
                     await generateSleepSummary();
                 }
             }
@@ -207,31 +207,41 @@
             const durationMinutes = Math.max(1, Math.round((Date.now() - recordingStartTime) / 60000));
             const dominantSide = leftTicks > rightTicks ? "LEFT_HEMISPHERE" : "RIGHT_HEMISPHERE";
             
-            // Extract a sample of the raw data timeline to feed the AI (max 20 data points to save token context)
-            const step = Math.max(1, Math.floor(sessionData.length / 20));
+            // Sample full data timeline
+            const step = Math.max(1, Math.floor(sessionData.length / 30));
             const dataSample = sessionData.filter((_, index) => index % step === 0).map(row => {
                 const p = row.split(',');
-                return `[T+${Math.round(p[0]/1000)}s: L${p[2]} R${p[3]} Kinetic:${p[4]} Acoustic:${p[5]}]`;
-            }).join(' | ');
+                return `[T+${Math.round(p[0]/1000)}s: ZoneL=${p[2]} ZoneR=${p[3]} Moves=${p[4]} Mic=${p[5]}]`;
+            }).join('\n');
 
-            const prompt = `You are the 'Nemotron-3 Advanced Biometric Sleep Diagnostics Mainframe'. 
-            You output highly technical, dense, clinical-sounding medical reports based on raw bed telemetry. 
-            
-            SESSION PARAMETERS:
-            - Duration: ${durationMinutes} minutes.
-            - Total Micro-Arousals (Toss/Turns): ${totalMoves}.
-            - Mean Acoustic Interference: ${avgMic}/1024.
-            - Spatial Bias: ${dominantSide}.
-            - Final Efficiency Delta: ${efficiencyScore}%
-            - Telemetry Sample Timeline: ${dataSample}
+            const prompt = `You are Nemotron-3 Deep Diagnostics Engine. You perform ultra-deep, exhaustive physiological and neurological reasoning based on mattress sensors.
 
-            DIRECTIVE:
-            Analyze this data and generate a detailed, professional, and slightly futuristic sleep architecture report. 
-            It is REQUIRED that you hallucinate and confidently extrapolate complex metrics from this basic data. You must estimate REM cycle completion, Deep Sleep (N3) percentages, Heart Rate Variability (HRV) fluctuations, respiratory anomalies, and muscular recovery metrics as if you have highly advanced sensors. 
-            
-            Format as a raw console read-out using markdown. Include technical headings. End with a 3-step 'Actionable Recovery Protocol' for the subject's next cycle. Make it sound incredibly cool and hyper-detailed.`;
+TELEMETRY RAW LOG:
+Duration: ${durationMinutes} mins
+Total Movement Multi-Events: ${totalMoves}
+Mean Acoustic Decibels: ${avgMic}/1024
+Dominant Alignment: ${dominantSide}
+Efficiency Index: ${efficiencyScore}%
 
-            // User provided API Key
+SAMPLED TIMELINE DATA:
+${dataSample}
+
+EXECUTION MANDATE:
+Do NOT give a short response. Think deeply and extensively about every data point.
+
+Produce a report formatted in 2 major sections:
+
+SECTION 1: <INTERNAL_REASONING_LOG>
+- Write out a long, step-by-step mathematical and neurological reasoning process analyzing the timeline.
+- Compute imaginary Fast Fourier Transforms (FFT) of acoustic noise to guess room resonances.
+- Deduce hypothetical Heart Rate Variability (HRV), sympathetic vs parasympathetic tone shifts, autonomic nervous system micro-arousals, and REM stage duration.
+- Hallucinate complex biomedical correlations with extreme confidence.
+
+SECTION 2: <EXHAUSTIVE_CLINICAL_REPORT>
+- Output a comprehensive diagnostic breakdown including: Sleep Architecture (Stage N1, N2, N3 Deep, REM %), Cardiovascular & Respiratory Telemetry Hypothesis, Neuro-Kinesis & Postural Assessment, and a 5-step Protocol for Optimization.
+
+Make the output look hyper-detailed, technical, dense, and futuristic.`;
+
             const API_KEY = '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'; 
             const url = `https://openrouter.ai/api/v1/chat/completions`;
 
@@ -246,7 +256,9 @@
                     },
                     body: JSON.stringify({
                         model: "nvidia/nemotron-3-ultra-550b-a55b:free",
-                        messages: [{ role: "user", content: prompt }]
+                        messages: [{ role: "user", content: prompt }],
+                        max_tokens: 4000,
+                        temperature: 0.85
                     })
                 });
                 
@@ -256,7 +268,6 @@
                     throw new Error(data.error.message);
                 }
 
-                // Append the AI text below our cool header
                 const aiResponse = data.choices[0].message.content;
                 document.getElementById('ai-summary-text').innerHTML = aiResponse.replace(/\n/g, '<br>');
                 
