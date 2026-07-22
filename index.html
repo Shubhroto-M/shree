@@ -77,9 +77,9 @@
 
     <div class="grid">
         <div class="card">
-            <div class="card-label">Overall Efficiency</div>
-            <div class="card-value" id="score-val" style="color: var(--accent-green);">--</div>
-            <div style="font-size: 14px; color: var(--text-dim); margin-top: 8px; font-family: monospace;" id="score-sub">PENDING_SESSION</div>
+            <div class="card-label">Sleep Efficiency</div>
+            <div class="card-value" id="score-val" style="color: var(--accent-green);">100%</div>
+            <div style="font-size: 14px; color: var(--text-dim); margin-top: 8px; font-family: monospace;" id="score-sub">OPTIMAL_REST</div>
         </div>
         <div class="card">
             <div class="card-label">Spatial Orientation</div>
@@ -110,7 +110,7 @@
             <span id="ai-status" style="font-size: 11px; color: var(--text-dim);">Ready</span>
         </div>
         <div id="chat-history">
-            <div class="chat-msg system">System initialized. Complete a logging session to compute overall efficiency and unlock assistant chat capabilities.</div>
+            <div class="chat-msg system">System initialized. Complete a logging session to generate your telemetry summary and unlock assistant chat capabilities.</div>
         </div>
         <div class="chat-input-row">
             <input type="text" id="chat-input" placeholder="Ask questions about your recorded session..." disabled>
@@ -120,7 +120,8 @@
 
     <script>
         let port, reader;
-        let finalEfficiencyScore = 100;
+        let efficiencyScore = 100;
+        let lastMoveCount = 0;
         
         let isRecording = false;
         let sessionData = [];
@@ -184,6 +185,8 @@
                 document.getElementById('downloadBtn').style.display = 'none';
                 aiContainer.style.display = 'none';
                 sessionData = []; 
+                efficiencyScore = 100; // Reset score on new session start
+                lastMoveCount = 0;
                 recordingStartTime = Date.now();
                 document.getElementById('statusText').innerText = 'RECORDING_TELEMETRY...';
             } else {
@@ -193,9 +196,8 @@
                 document.getElementById('statusText').innerText = 'DATALINK_ESTABLISHED';
                 
                 if (sessionData.length > 0) {
-                    calculateOverallEfficiency();
                     aiContainer.style.display = 'block';
-                    appendChat("system", ">> COMPUTED OVERALL EFFICIENCY. PROCESSING TELEMETRY SUMMARY...");
+                    appendChat("system", ">> PROCESSING LOGGED SESSION TELEMETRY VIA NEMOTRON NANO OMNI...");
                     await generateInitialSummary();
                 }
             }
@@ -208,35 +210,6 @@
             a.download = `BioTelemetry_${Date.now()}.csv`;
             a.click();
         });
-
-        function calculateOverallEfficiency() {
-            let totalMoves = 0;
-            let noisyTicks = 0;
-            
-            sessionData.forEach(row => {
-                const parts = row.split(',');
-                const mic = parseInt(parts[5] || 0);
-                if (mic > 45) noisyTicks++;
-                totalMoves = Math.max(totalMoves, parseInt(parts[4] || 0));
-            });
-
-            // Base calculation: start at 100%, deduct penalties based on overall session noise ratio and total moves
-            let penalty = (noisyTicks * 0.8) + (totalMoves * 1.5);
-            finalEfficiencyScore = Math.max(30, Math.round(100 - penalty));
-
-            const scoreEl = document.getElementById('score-val');
-            scoreEl.innerText = finalEfficiencyScore + '%';
-            if (finalEfficiencyScore >= 85) {
-                scoreEl.style.color = 'var(--accent-green)';
-                document.getElementById('score-sub').innerText = 'OPTIMAL_REST';
-            } else if (finalEfficiencyScore >= 70) {
-                scoreEl.style.color = '#fbbf24';
-                document.getElementById('score-sub').innerText = 'MODERATE_REST';
-            } else {
-                scoreEl.style.color = 'var(--accent-red)';
-                document.getElementById('score-sub').innerText = 'HIGH_DISTURBANCE';
-            }
-        }
 
         function appendChat(role, text) {
             const historyEl = document.getElementById('chat-history');
@@ -285,12 +258,12 @@
             const durationMinutes = Math.max(1, Math.round((Date.now() - recordingStartTime) / 60000));
             const dominantSide = leftTicks > rightTicks ? "Left Side" : "Right Side";
             
-            sessionSummaryContext = `Session Metrics: Duration: ${durationMinutes} mins, Toss & Turn Events: ${totalMoves}, Average Room Noise (Mic Volume): ${avgMic}/1024, Preferred Sleep Posture Position: ${dominantSide}, Overall Session Efficiency Score: ${finalEfficiencyScore}%.`;
+            sessionSummaryContext = `Session Metrics: Duration: ${durationMinutes} mins, Toss & Turn Events: ${totalMoves}, Average Room Noise (Mic Volume): ${avgMic}/1024, Preferred Sleep Posture Position: ${dominantSide}, Final Cumulative Efficiency Score: ${Math.round(efficiencyScore)}%.`;
 
             const systemPrompt = `You are a factual sleep hardware telemetry assistant. You analyze real sensor data from a smart mattress pad (Tracking movement/toss-and-turns, left/right bed weight distribution zones, microphone room sound levels, and HVAC fan load). 
             Do NOT invent or hallucinate unmeasured metrics like brain waves, REM percentages, or heart rates. Stick precisely to the physical telemetry provided. Keep your evaluation grounded, clear, and direct.`;
 
-            const userPrompt = `Here is my completed sleep session data summary:\n${sessionSummaryContext}\n\nProvide a concise evaluation of my overall sleep efficiency, movement, noise exposure, and position choices based strictly on these metrics.`;
+            const userPrompt = `Here is my latest sleep session data:\n${sessionSummaryContext}\n\nProvide a concise evaluation of my movement, noise exposure, and position choices based strictly on these metrics.`;
 
             chatConversationHistory = [
                 { role: "system", content: systemPrompt },
@@ -378,6 +351,28 @@
                 else document.getElementById('state-val').innerText = 'SCANNING...'; 
                 
                 document.getElementById('state-val').style.color = '#fff';
+
+                // Cumulative penalties only (Efficiency never climbs back up mid-session)
+                if (vals.MicVol > 45) {
+                    efficiencyScore = Math.max(30, efficiencyScore - 0.5);
+                }
+                if (vals.Moves > lastMoveCount) {
+                    efficiencyScore = Math.max(30, efficiencyScore - 2.0); 
+                    lastMoveCount = vals.Moves;
+                }
+            }
+
+            const scoreEl = document.getElementById('score-val');
+            scoreEl.innerText = Math.round(efficiencyScore) + '%';
+            if (efficiencyScore >= 85) {
+                scoreEl.style.color = 'var(--accent-green)';
+                document.getElementById('score-sub').innerText = 'OPTIMAL_REST';
+            } else if (efficiencyScore >= 70) {
+                scoreEl.style.color = '#fbbf24';
+                document.getElementById('score-sub').innerText = 'MODERATE_REST';
+            } else {
+                scoreEl.style.color = 'var(--accent-red)';
+                document.getElementById('score-sub').innerText = 'HIGH_DISTURBANCE';
             }
 
             if (isRecording) {
