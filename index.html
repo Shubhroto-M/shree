@@ -352,13 +352,16 @@
                 
                 document.getElementById('state-val').style.color = '#fff';
 
-                // Cumulative penalties only (Efficiency never climbs back up mid-session)
+                // Penalties for disturbances, with a very slow recovery for good sleep
                 if (vals.MicVol > 45) {
                     efficiencyScore = Math.max(30, efficiencyScore - 0.5);
-                }
-                if (vals.Moves > lastMoveCount) {
+                } else if (vals.Moves > lastMoveCount) {
                     efficiencyScore = Math.max(30, efficiencyScore - 2.0); 
                     lastMoveCount = vals.Moves;
+                } else {
+                    // SLOW RECOVERY: Adds a tiny amount back if quiet and still. 
+                    // Depending on your sensor's polling rate, this will take minutes of perfect sleep to recover 1%
+                    efficiencyScore = Math.min(100, efficiencyScore + 0.02); 
                 }
             }
 
