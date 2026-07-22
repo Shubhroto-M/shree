@@ -113,7 +113,7 @@
             <div class="chat-msg system">System initialized. Complete a logging session to generate your telemetry summary and unlock assistant chat capabilities.</div>
         </div>
         <div class="chat-input-row">
-            <input type="text" id="chat-input" placeholder="Ask questions about your recorded session (e.g., 'Why did my movement spike around minute 2?')..." disabled>
+            <input type="text" id="chat-input" placeholder="Ask questions about your recorded session (e.g., 'How stable was my sleeping position?')..." disabled>
             <button id="send-chat-btn" disabled>SEND</button>
         </div>
     </div>
@@ -195,7 +195,7 @@
                 
                 if (sessionData.length > 0) {
                     aiContainer.style.display = 'block';
-                    appendChat("system", ">> PROCESSING LOGGED SESSION TELEMETRY...");
+                    appendChat("system", ">> PROCESSING LOGGED SESSION TELEMETRY VIA NEMOTRON NANO OMNI...");
                     await generateInitialSummary();
                 }
             }
@@ -228,9 +228,9 @@
                     'X-Title': 'Biometric Sleep Console' 
                 },
                 body: JSON.stringify({
-                    model: "nvidia/nemotron-3-ultra-550b-a55b:free",
+                    model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
                     messages: messagesArray,
-                    temperature: 0.4
+                    temperature: 0.3
                 })
             });
             const data = await response.json();
@@ -259,9 +259,9 @@
             sessionSummaryContext = `Session Metrics: Duration: ${durationMinutes} mins, Toss & Turn Events: ${totalMoves}, Average Room Noise (Mic Volume): ${avgMic}/1024, Preferred Sleep Posture Position: ${dominantSide}, Final Efficiency Score: ${Math.round(efficiencyScore)}%.`;
 
             const systemPrompt = `You are a factual sleep hardware telemetry assistant. You analyze real sensor data from a smart mattress pad (Tracking movement/toss-and-turns, left/right bed weight distribution zones, microphone room sound levels, and HVAC fan load). 
-            Do NOT hallucinate medical metrics like brain waves, REM percentages, or heart rates. Stick precisely to the physical telemetry provided. Be concise, realistic, and practical.`;
+            Do NOT invent or hallucinate unmeasured metrics like brain waves, REM percentages, or heart rates. Stick precisely to the physical telemetry provided. Keep your evaluation grounded, clear, and direct.`;
 
-            const userPrompt = `Here is my latest sleep session data:\n${sessionSummaryContext}\n\nProvide a concise, practical evaluation of my movement, noise exposure, and position choices based strictly on these metrics.`;
+            const userPrompt = `Here is my latest sleep session data:\n${sessionSummaryContext}\n\nProvide a concise evaluation of my movement, noise exposure, and position choices based strictly on these metrics.`;
 
             chatConversationHistory = [
                 { role: "system", content: systemPrompt },
@@ -273,10 +273,8 @@
                 const aiResponse = await callOpenRouter(chatConversationHistory);
                 appendChat("assistant", aiResponse);
                 
-                // Push assistant response to history context for follow-up chat
                 chatConversationHistory.push({ role: "assistant", content: aiResponse });
                 
-                // Enable chat box
                 document.getElementById('chat-input').disabled = false;
                 document.getElementById('send-chat-btn').disabled = false;
                 document.getElementById('ai-status').innerText = 'Ready for questions';
@@ -286,7 +284,6 @@
             }
         }
 
-        // Chat Follow-up handler
         async function sendUserMessage() {
             const inputEl = document.getElementById('chat-input');
             const userText = inputEl.value.trim();
@@ -298,10 +295,9 @@
             document.getElementById('send-chat-btn').disabled = true;
             document.getElementById('ai-status').innerText = 'Thinking...';
 
-            // Ensure questions stay related to the system/sleep data
             chatConversationHistory.push({ 
                 role: "user", 
-                content: `User follow-up question regarding their sleep session data (${sessionSummaryContext}): ${userText}. (Note: If the question is entirely unrelated to sleep, the bed system, or their telemetry data, politely redirect them back to the sleep console system).` 
+                content: `User follow-up question regarding their sleep session data (${sessionSummaryContext}): ${userText}. (Constraint: If the question is completely unrelated to sleep, the bed system, or their telemetry data, politely redirect them back to the sleep console system).` 
             });
 
             try {
